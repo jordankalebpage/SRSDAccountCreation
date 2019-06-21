@@ -9,19 +9,25 @@ from bisect import bisect_left, insort_left
 from random import randint, SystemRandom
 from collections import deque, OrderedDict
 from subprocess import call
+# from time import sleep
 
 # installed dependencies
 import requests
 import pysftp
 from profanityfilter import ProfanityFilter
 from ldap3 import Server, Connection, NONE, SUBTREE
+# from selenium import webdriver
+# from selenium.common.exceptions import TimeoutException
+# from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support import expected_conditions as EC
+# from selenium.webdriver.common.by import By
 
 __author__ = 'Jordan Page'
 __license__ = 'MIT'
 __version__ = '1.0.0'
 __email__ = 'jpage628@gmail.com'
 __date__ = '2/28/2019'
-__status__ = 'Development'
+__status__ = 'Production'
 
 
 def create_student(information_list, grade_level_list):
@@ -64,7 +70,7 @@ def create_student(information_list, grade_level_list):
         last_name_split = split_name(last_name)
         grade_level_list.append(grade_level)
 
-        username_list = usernames_from_sftp()
+        username_list = usernames_from_sftp()[0]
 
         if len(last_name_split) >= 5:
             candidate = str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]
@@ -142,10 +148,7 @@ def split_name(name):
 def usernames_from_sftp():
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-    print('SFTP Username: ')
-    username = str(input())
-    password = getpass.getpass('SFTP Password: ')
-    srv = pysftp.Connection(host='10.110.204.14', username=username, password=password, port=22, cnopts=cnopts)
+    srv = pysftp.Connection(host='10.110.204.14', username='steveftp', password='spinnit44', port=22, cnopts=cnopts)
     srv.get('/Steve/student.csv', preserve_mtime=True)
 
     srv.close()
@@ -159,6 +162,8 @@ def usernames_from_sftp():
             first_name = str(line.split(',')[0]).title()
             last_name = str(line.split(',')[1]).title()
             curr_grade = str(line.split(',')[3]).strip()
+            birthday = str(line.split(',')[4]).strip()
+            student_id = str(line.split(',')[5]).strip()
             if int(curr_grade) < 1:
                 continue
             if "'" in curr_username:
@@ -167,15 +172,16 @@ def usernames_from_sftp():
                 curr_username = curr_username.replace(" ", "")
 
             if curr_username == '':
-                needs_username_list.append([first_name, last_name, curr_grade])
+                needs_username_list.append([first_name, last_name, curr_grade, birthday, student_id])
             else:
-                ps_user_list[curr_username] = [first_name, last_name, curr_grade]
+                ps_user_list[curr_username] = [first_name, last_name, curr_grade, birthday, student_id]
         f.close()
 
     print('\nStudent list successfully obtained via SFTP.\n')
 
     print('Students who need PowerSchool usernames: ')
     print(needs_username_list)
+    print()
 
     return ps_user_list, needs_username_list
 
@@ -252,13 +258,13 @@ def compare_to_ldap(powerschool_users):
                 print('Error - ' + username + ' could not be deleted.')
         print('\nAccount deletion process completed.')
 
-    create_ldap_accounts(needs_account)
+    pass_list = create_ldap_accounts(needs_account)
+    update_students_in_ps(needs_account, pass_list)
     conn.unbind()
 
 
-# TODO
 def create_ldap_accounts(user_list):
-    info = convert_information(user_list)
+    info, pass_list = convert_information(user_list)
     grade_level_list = deque([])
     for value in user_list.values():
         grade_level_list.append(value[2])
@@ -267,10 +273,12 @@ def create_ldap_accounts(user_list):
     make_dynamic_ctl_files(grade_level_list)
     import_using_jrb()
 
+    return pass_list
 
-# TODO
+
 def convert_information(user_list):
     information_list = deque([])
+    pass_list = dict()
     for k in user_list.keys():
         word_list = make_word_file()
 
@@ -286,6 +294,7 @@ def convert_information(user_list):
             second_word = secure_random.choice(word_list).strip()
 
         pwd = (first_word + second_word + str(randint(0, 9)) + str(randint(0, 9)))
+        pass_list[k] = pwd
 
         first_name = user_list[k][0].title()
         last_name = user_list[k][1].title()
@@ -295,7 +304,7 @@ def convert_information(user_list):
 
         information_list.append(information)
 
-    return information_list
+    return information_list, pass_list
 
 
 def search(lst, item):
@@ -445,7 +454,7 @@ def make_dynamic_ctl_files(grade_level_list):
         grade_level_list.popleft()
 
 
-# Create user accounts through JRB using the created info and ctl files
+# Create user accounts through JRButils using the created info and ctl files
 def import_using_jrb():
     directory = 'c:\\jrb'
 
@@ -464,57 +473,111 @@ def import_using_jrb():
               '/$', '/e', '/v', '/x=10'])
 
 
+# Take the newly added first graders and update PowerSchool fields
+def update_students_in_ps(user_list, pass_list):
+    cnopts = pysftp.CnOpts()
+    cnopts.hostkeys = None
+    srv = pysftp.Connection(host='10.110.204.14', username='steveftp', password='spinnit44', port=22, cnopts=cnopts)
+
+    directory = os.getcwd()
+    filename = os.path.join(directory, 'new_stds.txt')
+
+    with open(filename, mode='w') as new_stds:
+        new_stds.write('student_number\tWeb_ID\tWeb_Password\tAllowWebAccess\t' +
+                       'Student_Web_ID\tStudent_Web_Password\tStudent_AllowWebAccess\tLunch_ID\n')
+        if len(user_list) == 0:
+            print('No students need to be updated.')
+            new_stds.close()
+            return
+        for k in user_list.keys():
+            password = pass_list[k]
+            student_number = user_list[k][4]
+            new_stds.write(student_number)
+            new_stds.write('\t')
+            new_stds.write(str(excel_date(user_list[k][3])) + user_list[k][0][:3].lower())
+            new_stds.write('\t')
+            new_stds.write(student_number)
+            new_stds.write('\t')
+            new_stds.write('1')
+            new_stds.write('\t')
+            new_stds.write(k)
+            new_stds.write('\t')
+            new_stds.write(password)
+            new_stds.write('\t')
+            new_stds.write('1')
+            new_stds.write('\t')
+            new_stds.write(student_number)
+            new_stds.write('\n')
+
+        new_stds.close()
+
+    srv.put(filename, '/Steve/new_stds.txt', preserve_mtime=True)
+
+    srv.close()
+
+
+# Generates a parent's username by converting student's birthday to Excel ordinal
+def excel_date(date):
+    temp = datetime.datetime(1899, 12, 31)
+    delta = datetime.datetime.strptime(date, '%m/%d/%Y') - temp
+    return int(delta.days) + int(int(delta.seconds) / 86400) + 1
+
+
 # main function
 def create_user():
     while True:
-        # print("Are you creating a student or staff account?: ")
-        # user_prompt = input().lower().strip()
+        print()
+        print('1) Run the manual student creation utility ' +
+              '(creates student in LDAP. Will have to be manually added to PowerSchool)')
+        print('2) Run the automated student creation/deletion utility (also updates student info in PowerSchool)')
+        print('3) Quit')
+        menu_prompt = int(input().strip())
 
-        ps_user_list, needs_username_list = usernames_from_sftp()
-        compare_to_ldap(ps_user_list)
-        # import_using_jrb()
-        sys.exit(0)
+        if menu_prompt == 1:
+            # print("Are you creating a student or staff account?: ")
+            # user_prompt = input().lower().strip()
+            # delete the line below once staff is implemented
+            user_prompt = "student"
 
-        # delete this once staff is implemented
-        user_prompt = "student"
-
-        if not (user_prompt == "student") and not (user_prompt == "staff"):
-            print("You must enter either student or staff.")
-            continue
-        else:
-            if user_prompt == "student":
-                student_information_list = deque([])
-                grade_level_list = deque([])
-                information, grade_levels = create_student(student_information_list, grade_level_list)
-            # else:
-            #     create_staff()
-
-            print("\nWould you like to create another account?(y/n): ")
-            user_prompt = input().lower().strip()
-            while not ((user_prompt == 'y') or (user_prompt == 'yes') or
-                       (user_prompt == 'n') or (user_prompt == 'no')):
-                print("You must enter y, yes, n, or no.")
-                print("Would you like to create another account?(y/n): ")
-                user_prompt = input().lower().strip()
-            if (user_prompt == 'y') or (user_prompt == 'yes'):
+            if not (user_prompt == "student") and not (user_prompt == "staff"):
+                print("You must enter either student or staff.")
                 continue
-            elif (user_prompt == 'n') or (user_prompt == 'no'):
-                make_info_files(information, grade_levels)
-                make_dynamic_ctl_files(grade_levels)
-                import_using_jrb()
+            else:
+                if user_prompt == "student":
+                    student_information_list = deque([])
+                    grade_level_list = deque([])
+                    information, grade_levels = create_student(student_information_list, grade_level_list)
+                # else:
+                #     create_staff()
 
-                sys.exit(0)
+                print("\nWould you like to create another account?(y/n): ")
+                user_prompt = input().lower().strip()
+                while not ((user_prompt == 'y') or (user_prompt == 'yes') or
+                           (user_prompt == 'n') or (user_prompt == 'no')):
+                    print("You must enter y, yes, n, or no.")
+                    print("Would you like to create another account?(y/n): ")
+                    user_prompt = input().lower().strip()
+                if (user_prompt == 'y') or (user_prompt == 'yes'):
+                    continue
+                elif (user_prompt == 'n') or (user_prompt == 'no'):
+                    # Finally add the students that we created through this program to LDAP
+                    make_info_files(information, grade_levels)
+                    make_dynamic_ctl_files(grade_levels)
+                    import_using_jrb()
+        elif menu_prompt == 2:
+            ps_user_list, needs_username_list = usernames_from_sftp()
+            compare_to_ldap(ps_user_list)
+        elif menu_prompt == 3:
+            sys.exit(0)
+        else:
+            print('Only 1, 2, or 3 may be entered.')
+            continue
 
 
 if __name__ == '__main__':
     create_user()
 
-# Currently not in use:
-# Generates a parent's username by converting parent's birthday to Excel ordinal
-# def excel_date(date):
-#    temp = datetime.datetime(1899, 12, 31)
-#    delta = datetime.datetime.strptime(date, '%m/%d/%Y') - temp
-#    return int(delta.days) + int(int(delta.seconds) / 86400)
+# Currently not in use
 #
 # def generate_staff_username_list():
 #

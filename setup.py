@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='user_creation',
     version='1.0',
-    description='Creates a user for Snake River School District, as well as deleting old users and creating accounts' +
+    description='Creates users for Snake River School District. Also can delete old users and create accounts' +
     ' for upcoming 2nd graders',
     author='Jordan Page',
     author_email='jpage628@gmail.com',
