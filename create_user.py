@@ -148,7 +148,8 @@ def split_name(name):
 def usernames_from_sftp():
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-    srv = pysftp.Connection(host='10.110.204.14', username='steveftp', password='spinnit44', port=22, cnopts=cnopts)
+# *** CHANGE USERNAME AND PASSWORD HERE ***
+    srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
     srv.get('/Steve/student.csv', preserve_mtime=True)
 
     srv.close()
@@ -477,7 +478,8 @@ def import_using_jrb():
 def update_students_in_ps(user_list, pass_list):
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-    srv = pysftp.Connection(host='10.110.204.14', username='steveftp', password='spinnit44', port=22, cnopts=cnopts)
+# *** CHANGE USERNAME AND PASSWORD HERE ***
+    srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
 
     directory = os.getcwd()
     filename = os.path.join(directory, 'new_stds.txt')
