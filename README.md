@@ -8,7 +8,7 @@ Creates users for Snake River School District. Deletes old users and creates acc
 3) Extract the ZIP in a memorable location, as you will be running the script from that folder.
 
 4) Open a Command Prompt in the "SRSDAccountCreation-master" folder. An easy way to do this is to open that folder, Right Click while holding Shift, then click "Open command prompt here"
-     * Newer versions of Windows will have PowerShell instead of command prompt. This also works. Just click on "Open PowerShell window here" instead. *
+     Newer versions of Windows will have PowerShell instead of command prompt. This also works. Just click on "Open PowerShell window here" instead.
      
 5) To perform the one-time setup, run the following in the command prompt or PowerShell window:
 
