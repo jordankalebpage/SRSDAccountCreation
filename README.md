@@ -4,7 +4,7 @@ Creates users for Snake River School District. Deletes old users and creates acc
 1) Get the latest version of Python 3 at (https://www.python.org/downloads)
 2) At the main github page (https://github.com/benemortasia/SRSDAccountCreation), press the green "Clone or download" and download the ZIP.
 3) Extract the ZIP in a memorable location, as you will be running the script from that folder.
-4) Open a command prompt in the "SRSDAccountCreation-master" folder. An easy way to do this is to go to the folder, Right Click while holding Shift, then click "Open command prompt here"
+4) Open a command prompt in the "SRSDAccountCreation-master" folder. An easy way to do this is to open that folder, Right Click while holding Shift, then click "Open command prompt here"
 5) To perform the one-time setup, run the following in the command prompt:
 
   python.exe setup.py develop
