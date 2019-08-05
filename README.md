@@ -8,8 +8,8 @@ Creates users for Snake River School District. Deletes old users and creates acc
 * Newer versions of Windows will have PowerShell instead of command prompt. This will also work. Just click on "Open PowerShell window here" instead. *
 5) To perform the one-time setup, run the following in the command prompt or PowerShell window:
 
-  python.exe setup.py develop
+  ```python.exe setup.py develop```
 
 6) Run the following anytime you want to use the script (you won't have to run the setup anymore):
 
-  python.exe user_creation.py
+  ```python.exe user_creation.py```
