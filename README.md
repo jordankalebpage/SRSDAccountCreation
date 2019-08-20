@@ -1,7 +1,7 @@
 # SRSDAccountCreation
 Creates users for Snake River School District. Deletes old users and creates accounts for upcoming 2nd graders
 
-- [ ] 1. Get the latest version of Python 3 at (https://www.python.org/downloads)
+- [ ] 1. [Get the latest version of Python 3.](https://www.python.org/downloads)
 
 - [ ] 2. At the [main github page](https://github.com/benemortasia/SRSDAccountCreation), press the green "Clone or download" and download the ZIP.
 
