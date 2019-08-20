@@ -470,7 +470,7 @@ def import_using_jrb():
     for i in range(0, len(info_file_list)):
         curr_info_file = info_file_list[i]
         curr_ctl_file = ctl_file_list[i]
-        # *** Change the jrbimprt path here if necessary
+        # *** CHANGE JRBIMPRT PATH HERE IF NECESSARY
         call(['c:\\jrb\\Part_4\\jrbimprt.exe', curr_ctl_file, curr_info_file,
               '/$', '/e', '/v', '/x=10'])
 
