@@ -13,7 +13,11 @@ Creates users for Snake River School District. Deletes old users and creates acc
 5) To perform the one-time setup, run the following in the command prompt or PowerShell window:
 
   ```python.exe setup.py develop```
+  
+6) Before running the script, make sure a valid SFTP account username and password are in the code. There are two instances: one in the usernames_from_sftp function, and one in the update_students_in_ps function.
 
-6) Run the following anytime you want to use the script (you won't have to run the setup anymore):
+7) If the jrbimprt utility is not located at C:\jrb\Part_4\jrbimprt.exe , then the location needs to be changed in the import_using_jrb function.
 
-  ```python.exe user_creation.py```
+8) Run the following anytime you want to use the script (you won't have to run the setup anymore):
+
+  ```python.exe create_user.py```
