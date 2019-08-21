@@ -522,9 +522,9 @@ def update_students_in_ps(user_list, pass_list):
         print('No students need to be updated.')
         return
 
-    with open(filename, mode='w') as new_stds:
-        new_stds.write('student_number\tWeb_ID\tWeb_Password\tAllowWebAccess\t' +
-                       'Student_Web_ID\tStudent_Web_Password\tStudent_AllowWebAccess\tLunch_ID\n')
+    with open(filename, mode='a+') as new_stds:
+        # new_stds.write('student_number\tWeb_ID\tWeb_Password\tAllowWebAccess\t' +
+        #               'Student_Web_ID\tStudent_Web_Password\tStudent_AllowWebAccess\tLunch_ID\n')
         for k in user_list.keys():
             password = pass_list[k]
             student_number = user_list[k][4]
