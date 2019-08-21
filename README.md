@@ -19,6 +19,6 @@ Creates users for Snake River School District. Deletes old users and creates acc
 
 8. Make sure you are logged into Open Enterprise Server because jrbimprt needs to know which LDAP server to create the accounts in.
 
-9. Run the following anytime you want to use the script (you won't have to run the setup anymore):
+9. Run the following anytime you want to use the script (you won't have to run the setup command in Step 5 anymore):
 
   `python.exe create_user.py`
