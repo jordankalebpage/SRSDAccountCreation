@@ -26,9 +26,9 @@ from ldap3 import Server, Connection, NONE, SUBTREE
 
 __author__ = 'Jordan Page'
 __license__ = 'MIT'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __email__ = 'jpage628@gmail.com'
-__date__ = '2/28/2019'
+__date__ = '8/21/2019'
 __status__ = 'Development'
 
 
