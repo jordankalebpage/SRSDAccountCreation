@@ -27,7 +27,7 @@ __license__ = 'MIT'
 __version__ = '1.0.0'
 __email__ = 'jpage628@gmail.com'
 __date__ = '2/28/2019'
-__status__ = 'Production'
+__status__ = 'Development'
 
 
 def create_student(information_list, grade_level_list):
@@ -70,7 +70,8 @@ def create_student(information_list, grade_level_list):
         last_name_split = split_name(last_name)
         grade_level_list.append(grade_level)
 
-        username_list = usernames_from_sftp()[0]
+        
+        _list = usernames_from_sftp()[0]
 
         if len(last_name_split) >= 5:
             candidate = str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]
@@ -148,7 +149,7 @@ def split_name(name):
 def usernames_from_sftp():
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-# *** CHANGE USERNAME AND PASSWORD HERE ***
+    # *** ENTER SFTP USERNAME AND PASSWORD HERE
     srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
     srv.get('/Steve/student.csv', preserve_mtime=True)
 
@@ -181,18 +182,19 @@ def usernames_from_sftp():
     print('\nStudent list successfully obtained via SFTP.\n')
 
     print('Students who need PowerSchool usernames: ')
-    print(needs_username_list)
+    for student in needs_username_list:
+        print(student[0] + ' ' + student[1] + ', Grade ' + str(curr_grade))
     print()
 
     return ps_user_list, needs_username_list
 
 
 def compare_to_ldap(powerschool_users):
-    server = Server(host='10.110.204.21', port=636, use_ssl=True, get_info=NONE)
+    server = Server(host='10.110.204.2', port=636, use_ssl=True, get_info=NONE)
     print('Please enter your LDAP username: ')
     login_name = str(input())
     password = getpass.getpass()
-    conn = Connection(server, user='cn=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
+    conn = Connection(server, user='cn=' + login_name + 'o=Snakeriver', password=password)
     conn.bind()
 
     ldap_un_list = []
@@ -219,7 +221,7 @@ def compare_to_ldap(powerschool_users):
         if name in ldap_un_list:
             ldap_un_list.remove(name)
 
-    print('\n' + str(len(ldap_un_list)) + ' total students in LDAP.')
+    print('\n' + str(len(ldap_un_list)) + ' total students in LDAP, Grades 1-12.')
 
     needs_deletion = []
     for student in ldap_un_list:
@@ -245,19 +247,23 @@ def compare_to_ldap(powerschool_users):
     print('\n' + str(len(needs_account)) + ' accounts to be created.')
 
     if len(needs_deletion) == 0:
-        pass
+        print('No accounts need to be deleted.')
     else:
+        error_count = 0
         # User exists in LDAP but not PowerSchool -> we can delete them from LDAP
         for username in needs_deletion:
             conn.search(search_base='o=snakeriver',
                         search_filter='(uid=' + username + ')')
             user = conn.entries[0].entry_dn
+            print(user)
             conn.delete(user)
             if str(conn.result['description']) == 'success':
                 print('Success - ' + username + ' deleted.')
             else:
                 print('Error - ' + username + ' could not be deleted.')
-        print('\nAccount deletion process completed.')
+                error_count += 1
+            print()
+        print('\nAccount deletion process completed with ' + str(error_count) + ' errors.')
 
     pass_list = create_ldap_accounts(needs_account)
     update_students_in_ps(needs_account, pass_list)
@@ -470,7 +476,6 @@ def import_using_jrb():
     for i in range(0, len(info_file_list)):
         curr_info_file = info_file_list[i]
         curr_ctl_file = ctl_file_list[i]
-        # *** CHANGE JRBIMPRT PATH HERE IF NECESSARY
         call(['c:\\jrb\\Part_4\\jrbimprt.exe', curr_ctl_file, curr_info_file,
               '/$', '/e', '/v', '/x=10'])
 
@@ -479,7 +484,7 @@ def import_using_jrb():
 def update_students_in_ps(user_list, pass_list):
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-# *** CHANGE USERNAME AND PASSWORD HERE ***
+    # *** ENTER SFTP USERNAME AND PASSWORD HERE
     srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
 
     directory = os.getcwd()
