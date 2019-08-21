@@ -6,7 +6,7 @@ import os.path
 import glob
 import sys
 import getpass
-from re import compile, search
+from re import compile
 from bisect import bisect_left, insort_left
 from random import randint, SystemRandom
 from collections import deque, OrderedDict
