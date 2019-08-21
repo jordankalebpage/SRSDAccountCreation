@@ -6,6 +6,7 @@ import os.path
 import glob
 import sys
 import getpass
+from logging.handlers import RotatingFileHandler
 from re import compile
 from bisect import bisect_left, insort_left
 from random import randint, SystemRandom
@@ -34,37 +35,37 @@ __status__ = 'Development'
 
 def create_student(information_list, grade_level_list):
     while True:
-        print("Enter the student's First name: ")
+        logging.info("Enter the student's First name: ")
         first_name = input().strip()
         while check_name(first_name) is False:
-            print("A name must be alphabetical, or contain hyphens, spaces, or apostrophes.")
-            print("Enter the student's First name: ")
+            logging.info("A name must be alphabetical, or contain hyphens, spaces, or apostrophes.")
+            logging.info("Enter the student's First name: ")
             first_name = input().strip()
 
-        print("Enter the student's Last name: ")
+        logging.info("Enter the student's Last name: ")
         last_name = input().strip()
         while check_name(last_name) is False:
-            print("A name must be alphabetical, or contain hyphens, spaces, or apostrophes.")
-            print("Enter the student's Last name: ")
+            logging.info("A name must be alphabetical, or contain hyphens, spaces, or apostrophes.")
+            logging.info("Enter the student's Last name: ")
             last_name = input()
 
         while True:
             try:
-                print("Enter the student's Grade level (0-12): ")
+                logging.info("Enter the student's Grade level (0-12): ")
                 grade_level = int(input())
             except ValueError:
-                print("The grade level must be a number (0-12).")
+                logging.info("The grade level must be a number (0-12).")
                 continue
             break
 
         while grade_level not in range(0, 13):
-            print("The grade level must be between 0 and 12.")
-            print("Enter the student's Grade level (0-12): ")
+            logging.info("The grade level must be between 0 and 12.")
+            logging.info("Enter the student's Grade level (0-12): ")
 
             try:
                 grade_level = int(input())
             except ValueError:
-                print("The grade level must be a number (0-12).")
+                logging.info("The grade level must be a number (0-12).")
                 continue
 
         graduation_year = (datetime.date.today().year + (12 - grade_level))
@@ -87,7 +88,7 @@ def create_student(information_list, grade_level_list):
                     resolve_username(candidate, username_list, first_name_split, last_name_split, graduation_year,
                                      'student')
 
-        print('\nCandidate username is: ' + candidate)
+        logging.info('\nCandidate username is: ' + candidate)
 
         word_list = make_word_file()
 
@@ -106,17 +107,17 @@ def create_student(information_list, grade_level_list):
 
         full_name = first_name.title() + ' ' + last_name.title()
         email = candidate + "@snakeriver.org"
-        print("\nInformation:")
+        logging.info("\nInformation:")
         information =\
             pwd + ',' + candidate + ',' + full_name + ',' + last_name.title() + ',' + first_name.title() + ',' + email
-        print(information)
+        logging.info(information)
 
-        print("\nDo you want to keep creating student accounts?(y/n): ")
+        logging.info("\nDo you want to keep creating student accounts?(y/n): ")
         user_prompt = input().lower()
         while not ((user_prompt == 'y') or (user_prompt == 'yes') or
                    (user_prompt == 'n') or (user_prompt == 'no')):
-            print("You must enter y, yes, n, or no.")
-            print("Do you want to keep creating student accounts?(y/n): ")
+            logging.info("You must enter y, yes, n, or no.")
+            logging.info("Do you want to keep creating student accounts?(y/n): ")
             user_prompt = input().lower()
         if (user_prompt == 'y') or (user_prompt == 'yes'):
             information_list.append(information)
@@ -150,7 +151,7 @@ def split_name(name):
 def usernames_from_sftp():
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-    # *** CHANGE FTP USERNAME AND PASSWORD HERE
+    # *** ENTER FTP USERNAME AND PASSWORD HERE
     srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
     srv.get('/Steve/student.csv', preserve_mtime=True)
 
@@ -185,40 +186,40 @@ def usernames_from_sftp():
                 ps_user_list[curr_username] = [first_name, last_name, curr_grade, birthday, student_id]
         f.close()
 
-    print('\nStudent list successfully obtained via SFTP.\n')
+    logging.info('\nStudent list successfully obtained via SFTP.\n')
 
-    print('Students who need PowerSchool usernames: ')
+    logging.info('Students who need PowerSchool usernames: ')
     for student in needs_username_list:
-        print(student[0] + ' ' + student[1] + ', Grade ' + str(curr_grade))
-    print()
+        logging.info(student[0] + ' ' + student[1] + ', Grade ' + str(curr_grade))
+    logging.info('\n')
 
-    print("Students with incorrect web ID's: ")
+    logging.info("Students with incorrect web ID's: ")
     for student in wrong_web_id:
-        print(student)
-    print()
+        logging.info(student)
+    logging.info('\n')
     if len(wrong_web_id) > 0:
         new_web_id = []
         for student in wrong_web_id.keys():
             graduation_year = (datetime.date.today().year + (12 - int(wrong_web_id[student][2])))[2:]
             new_web_id.append(resolve_username(student, ps_user_list, wrong_web_id[student][0],
                                                wrong_web_id[student][1], graduation_year, student))
-        print("Recommended new web ID's: ")
+        logging.info("Recommended new web ID's: ")
         for student in new_web_id:
-            print(student)
-        print()
+            logging.info(student)
+        logging.info('\n')
     return ps_user_list, needs_username_list
 
 
 def compare_to_ldap(powerschool_users):
     server = Server(host='10.110.204.21', port=636, use_ssl=True, get_info=NONE)
-    print('Please enter your LDAP username: ')
+    logging.info('Please enter your LDAP username: ')
     login_name = str(input())
     password = getpass.getpass()
     conn = Connection(server, user='cn=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
     conn.bind()
     while conn.result['description'] == 'invalidCredentials':
-        print('Incorrect username, password, or context. Please try again.')
-        print('Please enter your LDAP username: ')
+        logging.info('Incorrect username or password. Please try again.')
+        logging.info('Please enter your LDAP username: ')
         login_name = str(input())
         password = getpass.getpass()
         conn = Connection(server, user='CN=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
@@ -226,12 +227,12 @@ def compare_to_ldap(powerschool_users):
 
     ldap_un_list = []
 
-    print()
+    logging.info('\n')
     search_filter = '(objectclass=Person)'
     for i in range(0, 13):
         curr_grade = 'Grade-' + str(i).zfill(2)
         search_base = 'ou=' + curr_grade + ',o=Snakeriver'
-        print('Searching ' + curr_grade)
+        logging.info('Searching ' + curr_grade)
         conn.search(search_base=search_base,
                     search_filter=search_filter,
                     search_scope=SUBTREE,
@@ -248,7 +249,7 @@ def compare_to_ldap(powerschool_users):
         if name in ldap_un_list:
             ldap_un_list.remove(name)
 
-    print('\n' + str(len(ldap_un_list)) + ' total students in LDAP, Grades 1-12.')
+    logging.info('\n' + str(len(ldap_un_list)) + ' total students in LDAP, Grades 0-12.')
     with open('ldap_un_list.log', mode='w') as file:
         for student in ldap_un_list:
             file.write(student + '\n')
@@ -258,9 +259,9 @@ def compare_to_ldap(powerschool_users):
             continue
         needs_deletion.append(student)
 
-    print('\nStudents who need to be deleted from LDAP:')
-    print(needs_deletion)
-    print('\n' + str(len(needs_deletion)) + ' accounts to be deleted.')
+    logging.info('\nStudents who need to be deleted from LDAP:')
+    logging.info(needs_deletion)
+    logging.info('\n' + str(len(needs_deletion)) + ' accounts to be deleted.')
 
     needs_account = OrderedDict()
     for student in powerschool_users.keys():
@@ -271,12 +272,12 @@ def compare_to_ldap(powerschool_users):
             continue
         needs_account[student] = powerschool_users[student]
 
-    print('\nStudents who need to be added to LDAP:')
-    print(needs_account.keys())
-    print('\n' + str(len(needs_account)) + ' accounts to be created in LDAP.')
+    logging.info('\nStudents who need to be added to LDAP:')
+    logging.info(needs_account.keys())
+    logging.info('\n' + str(len(needs_account)) + ' accounts to be created in LDAP.')
 
     if len(needs_deletion) == 0:
-        print('No accounts need to be deleted.')
+        logging.info('No accounts need to be deleted.')
     else:
         error_count = 0
         # User exists in LDAP but not PowerSchool -> we can delete them from LDAP
@@ -286,12 +287,12 @@ def compare_to_ldap(powerschool_users):
             user = conn.entries[0].entry_dn
             conn.delete(user)
             if str(conn.result['description']) == 'success':
-                print('Success - ' + username + ' deleted.')
+                logging.info('Success - ' + username + ' deleted.')
             else:
-                print('Error - ' + username + ' could not be deleted.')
+                logging.info('Error - ' + username + ' could not be deleted.')
                 error_count += 1
-            print()
-        print('\nAccount deletion process completed with ' + str(error_count) + ' errors.')
+            logging.info('\n')
+        logging.info('\nAccount deletion process completed with ' + str(error_count) + ' errors.')
 
     pass_list = create_ldap_accounts(needs_account)
     update_students_in_ps(needs_account, pass_list)
@@ -357,11 +358,11 @@ def resolve_username(curr_username, username_list, first_name, last_name, gradua
 
     if category == 'student':
         while search(username_list, curr_username) is not None:
-            print('\nUsername ' + curr_username + ' exists.')
+            logging.info('\nUsername ' + curr_username + ' exists.')
 
             # extreme edge case - all possible usernames are taken
             if num_attempts > 15:
-                print('Username could not be resolved.')
+                logging.info('Username could not be resolved.')
                 sys.exit(1)
 
             if len(curr_username) < 8:
@@ -374,11 +375,11 @@ def resolve_username(curr_username, username_list, first_name, last_name, gradua
             num_attempts += 1
     else:
         while search(username_list, curr_username) is not None:
-            print('\nUsername ' + curr_username + ' exists.')
+            logging.info('\nUsername ' + curr_username + ' exists.')
 
             # extreme edge case - all possible usernames are taken
             if num_attempts > 15:
-                print('Username could not be resolved.')
+                logging.info('Username could not be resolved.')
                 sys.exit(1)
 
             if len(curr_username) < 8:
@@ -390,7 +391,7 @@ def resolve_username(curr_username, username_list, first_name, last_name, gradua
 
             num_attempts += 1
 
-    print('Username modified to: ' + curr_username)
+    logging.info('Username modified to: ' + curr_username)
     return curr_username
 
 
@@ -407,7 +408,7 @@ def make_word_file():
         word_list = f.readlines()
         f.close()
     except FileNotFoundError:
-        print("File not found. Generating word list file...")
+        logging.info("File not found. Generating word list file...")
         word_site = "http://svnweb.freebsd.org/csrg/share/dict/words?view=co&content-type=text/plain"
         response = requests.get(word_site)
         word_list = response.content.splitlines()
@@ -430,10 +431,10 @@ def check_name_in_ldap(candidate):
 
     conn.search(search_base='o=snakeriver', search_filter='(uid=' + candidate + ')')
     if len(conn.entries) > 0:
-        print('Username exists in ldap: ')
-        print(conn.entries[0])
+        logging.info('Username exists in ldap: ')
+        logging.info(conn.entries[0])
         return False
-    print('Username not found in ldap.')
+    logging.info('Username not found in ldap.')
     return True
 
 
@@ -448,7 +449,7 @@ def make_info_files(information, grade_level_list):
         try:
             os.remove(filename)
         except OSError:
-            print('File ' + filename + ' is currently in use. Close the file and try again.')
+            logging.info('File ' + filename + ' is currently in use. Close the file and try again.')
 
     for grade in grade_level_list:
         new_path = file_path + '_Grade' + str(grade).zfill(2) + '.dat'
@@ -474,7 +475,7 @@ def make_dynamic_ctl_files(grade_level_list):
         try:
             os.remove(filename)
         except OSError:
-            print('File ' + filename + ' is currently in use. Close the file and try again.')
+            logging.info('File ' + filename + ' is currently in use. Close the file and try again.')
 
     while len(grade_level_list) != 0:
         with open(dynamic_file_path, mode='w') as dynamic_file:
@@ -512,14 +513,14 @@ def import_using_jrb():
 def update_students_in_ps(user_list, pass_list):
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-    # *** CHANGE FTP USERNAME AND PASSWORD HERE
+    # *** ENTER FTP USERNAME AND PASSWORD HERE
     srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
 
     directory = os.getcwd()
     filename = os.path.join(directory, 'new_stds.txt')
 
     if len(user_list) == 0:
-        print('No students need to be updated.')
+        logging.info('No students need to be updated.')
         return
 
     with open(filename, mode='a+') as new_stds:
@@ -562,11 +563,11 @@ def excel_date(date):
 # main function
 def create_user():
     while True:
-        print()
-        print('1) Run the manual student creation utility ' +
+        logging.info('\n')
+        logging.info('1) Run the manual student creation utility ' +
               '(creates student in LDAP. Will have to be manually added to PowerSchool)')
-        print('2) Run the automated student creation/deletion utility (also updates student info in PowerSchool)')
-        print('3) Quit')
+        logging.info('2) Run the automated student creation/deletion utility (also updates student info in PowerSchool)')
+        logging.info('3) Quit')
         menu_prompt = int(input().strip())
 
         if menu_prompt == 1:
@@ -576,7 +577,7 @@ def create_user():
             user_prompt = "student"
 
             if not (user_prompt == "student") and not (user_prompt == "staff"):
-                print("You must enter either student or staff.")
+                logging.info("You must enter either student or staff.")
                 continue
             else:
                 if user_prompt == "student":
@@ -586,12 +587,12 @@ def create_user():
                 # else:
                 #     create_staff()
 
-                print("\nWould you like to create another account?(y/n): ")
+                logging.info("\nWould you like to create another account?(y/n): ")
                 user_prompt = input().lower().strip()
                 while not ((user_prompt == 'y') or (user_prompt == 'yes') or
                            (user_prompt == 'n') or (user_prompt == 'no')):
-                    print("You must enter y, yes, n, or no.")
-                    print("Would you like to create another account?(y/n): ")
+                    logging.info("You must enter y, yes, n, or no.")
+                    logging.info("Would you like to create another account?(y/n): ")
                     user_prompt = input().lower().strip()
                 if (user_prompt == 'y') or (user_prompt == 'yes'):
                     continue
@@ -606,15 +607,34 @@ def create_user():
         elif menu_prompt == 3:
             sys.exit(0)
         else:
-            print('Only 1, 2, or 3 may be entered.')
+            logging.info('Only 1, 2, or 3 may be entered.')
             continue
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, filename="logfile", filemode="a+",
-                        format="%(asctime)-15s %(levelname)-8s %(message)s")
-    logging.info("SnakeRiverUserCreation")
+    log_formatter = logging.Formatter('%(asctime)-15s %(levelname)-8s %(message)s')
+
+    logFile = 'logfile.txt'
+
+    h1 = RotatingFileHandler(filename=logFile, mode='a', maxBytes=20 * 1024 * 1024, backupCount=2)
+    h1.setFormatter(log_formatter)
+    h1.setLevel(logging.DEBUG)
+
+    h2 = logging.StreamHandler(sys.stdout)
+    h2.setLevel(logging.INFO)
+    h2.setFormatter(logging.Formatter('%(message)s'))
+
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+
+    root.addHandler(h1)
+    root.addHandler(h2)
+
     create_user()
+
+    for handler in root.handlers:
+        handler.close()
+        root.removeFilter(handler)
 
 # Currently not in use
 #
