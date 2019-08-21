@@ -17,6 +17,8 @@ Creates users for Snake River School District. Deletes old users and creates acc
 
 7. If the jrbimprt utility is not located at C:\jrb\Part_4\jrbimprt.exe , then the file path needs to be changed in the import_using_jrb function.
 
-8. Run the following anytime you want to use the script (you won't have to run the setup anymore):
+8. Make sure you are logged into Open Enterprise Server because jrbimprt needs to know which LDAP server to create the accounts in.
+
+9. Run the following anytime you want to use the script (you won't have to run the setup anymore):
 
   `python.exe create_user.py`
