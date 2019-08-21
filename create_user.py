@@ -1,10 +1,12 @@
 #!/usr/bin/env python
+import logging
 import datetime
 import string
 import os.path
 import glob
 import sys
 import getpass
+from re import compile, search
 from bisect import bisect_left, insort_left
 from random import randint, SystemRandom
 from collections import deque, OrderedDict
@@ -70,8 +72,7 @@ def create_student(information_list, grade_level_list):
         last_name_split = split_name(last_name)
         grade_level_list.append(grade_level)
 
-        
-        _list = usernames_from_sftp()[0]
+        username_list = usernames_from_sftp()[0]
 
         if len(last_name_split) >= 5:
             candidate = str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]
@@ -149,7 +150,7 @@ def split_name(name):
 def usernames_from_sftp():
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-    # *** ENTER SFTP USERNAME AND PASSWORD HERE
+    # *** CHANGE FTP USERNAME AND PASSWORD HERE
     srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
     srv.get('/Steve/student.csv', preserve_mtime=True)
 
@@ -157,6 +158,8 @@ def usernames_from_sftp():
     ps_user_list_path = os.path.join(os.getcwd(), 'student.csv')
     ps_user_list = dict()
     needs_username_list = []
+    wrong_web_id = dict()
+    pattern = compile(r'^\d\d[a-zA-Z]{2,6}')
 
     with open(ps_user_list_path, mode='r', encoding='utf-8') as f:
         for line in f.readlines():
@@ -166,7 +169,7 @@ def usernames_from_sftp():
             curr_grade = str(line.split(',')[3]).strip()
             birthday = str(line.split(',')[4]).strip()
             student_id = str(line.split(',')[5]).strip()
-            if int(curr_grade) < 1:
+            if int(curr_grade) < 0:
                 continue
             if "'" in curr_username:
                 curr_username = curr_username.replace("'", "")
@@ -175,6 +178,9 @@ def usernames_from_sftp():
 
             if curr_username == '':
                 needs_username_list.append([first_name, last_name, curr_grade, birthday, student_id])
+            elif not pattern.fullmatch(curr_username):
+                wrong_web_id[curr_username] = \
+                    [split_name(first_name), split_name(last_name), curr_grade, birthday, student_id]
             else:
                 ps_user_list[curr_username] = [first_name, last_name, curr_grade, birthday, student_id]
         f.close()
@@ -186,24 +192,45 @@ def usernames_from_sftp():
         print(student[0] + ' ' + student[1] + ', Grade ' + str(curr_grade))
     print()
 
+    print("Students with incorrect web ID's: ")
+    for student in wrong_web_id:
+        print(student)
+    print()
+    if len(wrong_web_id) > 0:
+        new_web_id = []
+        for student in wrong_web_id.keys():
+            graduation_year = (datetime.date.today().year + (12 - int(wrong_web_id[student][2])))[2:]
+            new_web_id.append(resolve_username(student, ps_user_list, wrong_web_id[student][0],
+                                               wrong_web_id[student][1], graduation_year, student))
+        print("Recommended new web ID's: ")
+        for student in new_web_id:
+            print(student)
+        print()
     return ps_user_list, needs_username_list
 
 
 def compare_to_ldap(powerschool_users):
-    server = Server(host='10.110.204.2', port=636, use_ssl=True, get_info=NONE)
+    server = Server(host='10.110.204.21', port=636, use_ssl=True, get_info=NONE)
     print('Please enter your LDAP username: ')
     login_name = str(input())
     password = getpass.getpass()
-    conn = Connection(server, user='cn=' + login_name + 'o=Snakeriver', password=password)
+    conn = Connection(server, user='cn=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
     conn.bind()
+    while conn.result['description'] == 'invalidCredentials':
+        print('Incorrect username or password. Please try again.')
+        print('Please enter your LDAP username: ')
+        login_name = str(input())
+        password = getpass.getpass()
+        conn = Connection(server, user='CN=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
+        conn.bind()
 
     ldap_un_list = []
 
     print()
     search_filter = '(objectclass=Person)'
-    for i in range(1, 13):
+    for i in range(0, 13):
         curr_grade = 'Grade-' + str(i).zfill(2)
-        search_base = 'ou=' + curr_grade + ', o=snakeriver'
+        search_base = 'ou=' + curr_grade + ',o=Snakeriver'
         print('Searching ' + curr_grade)
         conn.search(search_base=search_base,
                     search_filter=search_filter,
@@ -222,7 +249,9 @@ def compare_to_ldap(powerschool_users):
             ldap_un_list.remove(name)
 
     print('\n' + str(len(ldap_un_list)) + ' total students in LDAP, Grades 1-12.')
-
+    with open('ldap_un_list.log', mode='w') as file:
+        for student in ldap_un_list:
+            file.write(student + '\n')
     needs_deletion = []
     for student in ldap_un_list:
         if student in powerschool_users.keys():
@@ -244,7 +273,7 @@ def compare_to_ldap(powerschool_users):
 
     print('\nStudents who need to be added to LDAP:')
     print(needs_account.keys())
-    print('\n' + str(len(needs_account)) + ' accounts to be created.')
+    print('\n' + str(len(needs_account)) + ' accounts to be created in LDAP.')
 
     if len(needs_deletion) == 0:
         print('No accounts need to be deleted.')
@@ -255,7 +284,6 @@ def compare_to_ldap(powerschool_users):
             conn.search(search_base='o=snakeriver',
                         search_filter='(uid=' + username + ')')
             user = conn.entries[0].entry_dn
-            print(user)
             conn.delete(user)
             if str(conn.result['description']) == 'success':
                 print('Success - ' + username + ' deleted.')
@@ -484,19 +512,19 @@ def import_using_jrb():
 def update_students_in_ps(user_list, pass_list):
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
-    # *** ENTER SFTP USERNAME AND PASSWORD HERE
+    # *** CHANGE FTP USERNAME AND PASSWORD HERE
     srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
 
     directory = os.getcwd()
     filename = os.path.join(directory, 'new_stds.txt')
 
+    if len(user_list) == 0:
+        print('No students need to be updated.')
+        return
+
     with open(filename, mode='w') as new_stds:
         new_stds.write('student_number\tWeb_ID\tWeb_Password\tAllowWebAccess\t' +
                        'Student_Web_ID\tStudent_Web_Password\tStudent_AllowWebAccess\tLunch_ID\n')
-        if len(user_list) == 0:
-            print('No students need to be updated.')
-            new_stds.close()
-            return
         for k in user_list.keys():
             password = pass_list[k]
             student_number = user_list[k][4]
@@ -583,6 +611,9 @@ def create_user():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG, filename="logfile", filemode="a+",
+                        format="%(asctime)-15s %(levelname)-8s %(message)s")
+    logging.info("SnakeRiverUserCreation")
     create_user()
 
 # Currently not in use
