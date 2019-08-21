@@ -217,7 +217,7 @@ def compare_to_ldap(powerschool_users):
     conn = Connection(server, user='cn=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
     conn.bind()
     while conn.result['description'] == 'invalidCredentials':
-        print('Incorrect username or password. Please try again.')
+        print('Incorrect username, password, or context. Please try again.')
         print('Please enter your LDAP username: ')
         login_name = str(input())
         password = getpass.getpass()
