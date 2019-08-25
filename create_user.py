@@ -210,7 +210,7 @@ def usernames_from_sftp():
     return ps_user_list, needs_username_list
 
 
-def compare_to_ldap(powerschool_users):
+def compare_to_ldap(powerschool_users, needs_ps_username=0):
     server = Server(host='10.110.204.21', port=636, use_ssl=True, get_info=NONE)
     logging.info('Please enter your LDAP username: ')
     login_name = str(input())
@@ -248,6 +248,9 @@ def compare_to_ldap(powerschool_users):
     for name in exclusion_list:
         if name in ldap_un_list:
             ldap_un_list.remove(name)
+            
+    if needs_ps_username == 1:
+        return ldap_un_list
 
     logging.info('\n' + str(len(ldap_un_list)) + ' total students in LDAP, Grades 0-12.')
     with open('ldap_un_list.log', mode='w') as file:
@@ -560,6 +563,38 @@ def excel_date(date):
     return int(delta.days) + int(int(delta.seconds) / 86400) + 1
 
 
+# templates
+# user[first_name, last_name, curr_grade, birthday, student_id]
+# resolve_username(curr_username, username_list, first_name, last_name, graduation_year, category):
+def handle_new_ps_users(needs_username_list):
+    new_username_list = dict()
+    empty_dict = dict()
+
+    ldap_un_list = compare_to_ldap(empty_dict, needs_ps_username=1)
+    for user in needs_username_list:
+        graduation_year = (datetime.date.today().year + (12 - user[2]) + 1)
+        first_name_split = split_name(user[0])
+        last_name_split = split_name(user[1])
+
+        if len(last_name_split) >= 5:
+            candidate = str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]
+            while candidate in ldap_un_list:
+                candidate = \
+                    resolve_username(candidate, ldap_un_list, first_name_split, last_name_split[:5],
+                                     graduation_year, 'student')
+        else:
+            candidate = str(graduation_year)[2:] + last_name_split + first_name_split[0]
+            while candidate in ldap_un_list:
+                candidate = \
+                    resolve_username(candidate, ldap_un_list, first_name_split, last_name_split, graduation_year,
+                                     'student')
+
+        new_username_list[candidate] = [user[0], user[1], user[2], user[3], user[4]]
+
+    pass_list = create_ldap_accounts(new_username_list)
+    update_students_in_ps(new_username_list, pass_list)
+    
+    
 # main function
 def create_user():
     while True:
@@ -604,6 +639,9 @@ def create_user():
         elif menu_prompt == 2:
             ps_user_list, needs_username_list = usernames_from_sftp()
             compare_to_ldap(ps_user_list)
+            
+            if len(needs_username_list) > 0:
+                handle_new_ps_users(needs_username_list)
         elif menu_prompt == 3:
             sys.exit(0)
         else:
