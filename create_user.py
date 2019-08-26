@@ -578,16 +578,16 @@ def handle_new_ps_users(needs_username_list):
 
         if len(last_name_split) >= 5:
             candidate = str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]
-            while candidate in ldap_un_list:
+            while (candidate in ldap_un_list) or (candidate in new_username_list.keys()):
                 candidate = \
-                    resolve_username(candidate, ldap_un_list, first_name_split, last_name_split[:5],
-                                     graduation_year, 'student')
+                    resolve_username(candidate, ldap_un_list + list(new_username_list.keys()), first_name_split,
+                                     last_name_split[:5], graduation_year, 'student')
         else:
             candidate = str(graduation_year)[2:] + last_name_split + first_name_split[0]
-            while candidate in ldap_un_list:
+            while (candidate in ldap_un_list) or (candidate in new_username_list.keys()):
                 candidate = \
-                    resolve_username(candidate, ldap_un_list, first_name_split, last_name_split, graduation_year,
-                                     'student')
+                    resolve_username(candidate, ldap_un_list + list(new_username_list.keys()), first_name_split,
+                                     last_name_split, graduation_year, 'student')
 
         new_username_list[candidate] = [user[0], user[1], user[2], user[3], user[4]]
 
