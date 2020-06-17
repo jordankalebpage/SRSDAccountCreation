@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 import logging
 import datetime
@@ -51,21 +52,21 @@ def create_student(information_list, grade_level_list):
 
         while True:
             try:
-                logging.info("Enter the student's Grade level (0-12): ")
+                logging.info("Enter the student's Grade level (-2 - 12): ")
                 grade_level = int(input())
             except ValueError:
-                logging.info("The grade level must be a number (0-12).")
+                logging.info("The grade level must be a number (-2 - 12).")
                 continue
             break
 
-        while grade_level not in range(0, 13):
-            logging.info("The grade level must be between 0 and 12.")
-            logging.info("Enter the student's Grade level (0-12): ")
+        while grade_level not in range(-2, 13):
+            logging.info("The grade level must be between -2 and 12.")
+            logging.info("Enter the student's Grade level (-2 - 12): ")
 
             try:
                 grade_level = int(input())
             except ValueError:
-                logging.info("The grade level must be a number (0-12).")
+                logging.info("The grade level must be a number (-2 - 12).")
                 continue
 
         graduation_year = (datetime.date.today().year + (12 - grade_level))
@@ -76,13 +77,13 @@ def create_student(information_list, grade_level_list):
         username_list = usernames_from_sftp()[0]
 
         if len(last_name_split) >= 5:
-            candidate = str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]
+            candidate = (str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]).lower()
             while check_name_in_ldap(candidate) is False:
                 candidate = \
                     resolve_username(candidate, username_list, first_name_split, last_name_split[:5], graduation_year,
                                      'student')
         else:
-            candidate = str(graduation_year)[2:] + last_name_split + first_name_split[0]
+            candidate = (str(graduation_year)[2:] + last_name_split + first_name_split[0]).lower()
             while check_name_in_ldap(candidate) is False:
                 candidate = \
                     resolve_username(candidate, username_list, first_name_split, last_name_split, graduation_year,
@@ -106,7 +107,7 @@ def create_student(information_list, grade_level_list):
         pwd = (first_word + second_word + str(randint(0, 9)) + str(randint(0, 9)))
 
         full_name = first_name.title() + ' ' + last_name.title()
-        email = candidate + "@snakeriver.org"
+        email = candidate + "@xyz.org"
         logging.info("\nInformation:")
         information =\
             pwd + ',' + candidate + ',' + full_name + ',' + last_name.title() + ',' + first_name.title() + ',' + email
@@ -152,26 +153,31 @@ def usernames_from_sftp():
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
     # *** ENTER FTP USERNAME AND PASSWORD HERE
-    srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
-    srv.get('/Steve/student.csv', preserve_mtime=True)
+    srv = pysftp.Connection(host='www.xxx.yyy.zzz', username='myname', password='mysecretpassword', port=22, cnopts=cnopts)
+    srv.get('/sample.csv', preserve_mtime=True)
 
     srv.close()
-    ps_user_list_path = os.path.join(os.getcwd(), 'student.csv')
-    ps_user_list = dict()
+    sis_user_list_path = os.path.join(os.getcwd(), 'sample.csv')
+    sis_user_list = dict()
     needs_username_list = []
     wrong_web_id = dict()
     pattern = compile(r'^\d\d[a-zA-Z]{2,6}')
 
-    with open(ps_user_list_path, mode='r', encoding='utf-8') as f:
+    with open(sis_user_list_path, mode='r', encoding='utf-8') as f:
         for line in f.readlines():
-            curr_username = str(line.split(',')[2])
+            curr_username = str(line.split(',')[2]).lower()
             first_name = str(line.split(',')[0]).title()
             last_name = str(line.split(',')[1]).title()
             curr_grade = str(line.split(',')[3]).strip()
             birthday = str(line.split(',')[4]).strip()
             student_id = str(line.split(',')[5]).strip()
-            if int(curr_grade) < 0:
+
+            if int(curr_grade) < -2:
                 continue
+            if (int(curr_grade) == -1):
+                curr_grade = 'PK4'
+            elif (int(curr_grade) == -2):
+                curr_grade = 'PK3'
             if "'" in curr_username:
                 curr_username = curr_username.replace("'", "")
             if " " in curr_username:
@@ -183,14 +189,16 @@ def usernames_from_sftp():
                 wrong_web_id[curr_username] = \
                     [split_name(first_name), split_name(last_name), curr_grade, birthday, student_id]
             else:
-                ps_user_list[curr_username] = [first_name, last_name, curr_grade, birthday, student_id]
+                sis_user_list[curr_username] = [first_name, last_name, curr_grade, birthday, student_id]
         f.close()
 
     logging.info('\nStudent list successfully obtained via SFTP.\n')
 
-    logging.info('Students who need PowerSchool usernames: ')
+    logging.info('Students who need SIS usernames: ')
+    # Issue is here, str(curr_grade) is pulling the last curr_grade as opposed to the grade associated with each student
+    # Think that should work but not sure until it's run  Missed a parenthesis smiling 
     for student in needs_username_list:
-        logging.info(student[0] + ' ' + student[1] + ', Grade ' + str(curr_grade))
+        logging.info(student[0] + ' ' + student[1] + ', Grade ' + str(student[2]))
     logging.info('\n')
 
     logging.info("Students with incorrect web ID's: ")
@@ -200,38 +208,51 @@ def usernames_from_sftp():
     if len(wrong_web_id) > 0:
         new_web_id = []
         for student in wrong_web_id.keys():
-            graduation_year = (datetime.date.today().year + (12 - int(wrong_web_id[student][2])))[2:]
-            new_web_id.append(resolve_username(student, ps_user_list, wrong_web_id[student][0],
+            if user[2] == 'PK3':
+                graduation_year = datetime.date.today().year + 14
+            elif user[2] == 'PK4':
+                graduation_year = datetime.date.today().year + 13
+            else:
+                graduation_year = (datetime.date.today().year + (12 - int(user[2])))
+                new_web_id.append(resolve_username(student, sis_user_list, wrong_web_id[student][0],
                                                wrong_web_id[student][1], graduation_year, student))
         logging.info("Recommended new web ID's: ")
         for student in new_web_id:
             logging.info(student)
         logging.info('\n')
-    return ps_user_list, needs_username_list
+        
+    return sis_user_list, needs_username_list
 
 
-def compare_to_ldap(powerschool_users, needs_ps_username=0):
-    server = Server(host='10.110.204.21', port=636, use_ssl=True, get_info=NONE)
-    logging.info('Please enter your LDAP username: ')
-    login_name = str(input())
-    password = getpass.getpass()
-    conn = Connection(server, user='cn=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
+def compare_to_ldap(sis_users, needs_sis_username=0):
+    server = Server(host='www.xxx.yyy.zzz', port=636, use_ssl=True, get_info=NONE)
+    # logging.info('Please enter your LDAP username: ')
+    login_name = 'myname'
+    password = 'supersecretpassword'
+    attempts = 0
+    conn = Connection(server, user='cn=' + login_name + ',o=xyz', password=password)
     conn.bind()
+
     while conn.result['description'] == 'invalidCredentials':
         logging.info('Incorrect username or password. Please try again.')
         logging.info('Please enter your LDAP username: ')
         login_name = str(input())
         password = getpass.getpass()
-        conn = Connection(server, user='CN=' + login_name + ',ou=NoEmail,o=Snakeriver', password=password)
+        attempts += 1
+        if attempts >= 3:
+            sys.exit(0)
+        conn = Connection(server, user='CN=' + login_name + ',o=xyz', password=password)
         conn.bind()
+
+    logging.info('LDAP Login successful')
 
     ldap_un_list = []
 
     logging.info('\n')
     search_filter = '(objectclass=Person)'
-    for i in range(0, 13):
-        curr_grade = 'Grade-' + str(i).zfill(2)
-        search_base = 'ou=' + curr_grade + ',o=Snakeriver'
+    for i in range(3, 5):
+        curr_grade = 'Grade-PK' + str(i)
+        search_base = 'ou=' + curr_grade + ',o=xyz'
         logging.info('Searching ' + curr_grade)
         conn.search(search_base=search_base,
                     search_filter=search_filter,
@@ -240,40 +261,55 @@ def compare_to_ldap(powerschool_users, needs_ps_username=0):
 
         for entry in conn.entries:
             uid = entry['uid'].value
-            ldap_un_list.append(uid)
+            ldap_un_list.append(uid.lower())
+    
+    for i in range(0, 13):
+        curr_grade = 'Grade-' + str(i).zfill(2)
+        search_base = 'ou=' + curr_grade + ',o=xyz'
+        logging.info('Searching ' + curr_grade)
+        conn.search(search_base=search_base,
+                    search_filter=search_filter,
+                    search_scope=SUBTREE,
+                    attributes=['uid'])
+
+        for entry in conn.entries:
+            uid = entry['uid'].value
+            ldap_un_list.append(uid.lower())
 
     ldap_un_list.sort()
 
-    exclusion_list = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th', 'billybob']
+    # *** Add any potential chromebook enrollment accounts here if necessary. e.g., PK3 or PK4
+    exclusion_list = ['PK3', 'PK4', '00', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th', 'billybob']
     for name in exclusion_list:
         if name in ldap_un_list:
             ldap_un_list.remove(name)
-            
-    if needs_ps_username == 1:
+
+    if needs_sis_username == 1:
         return ldap_un_list
 
-    logging.info('\n' + str(len(ldap_un_list)) + ' total students in LDAP, Grades 0-12.')
+    logging.info('\n' + str(len(ldap_un_list)) + ' total students in LDAP, Grades PK3-12.')
     with open('ldap_un_list.log', mode='w') as file:
         for student in ldap_un_list:
             file.write(student + '\n')
     needs_deletion = []
+ 
     for student in ldap_un_list:
-        if student in powerschool_users.keys():
+        if student in sis_users.keys():
             continue
         needs_deletion.append(student)
 
     logging.info('\nStudents who need to be deleted from LDAP:')
     logging.info(needs_deletion)
-    logging.info('\n' + str(len(needs_deletion)) + ' accounts to be deleted.')
+    logging.info('\n' + str(len(needs_deletion)) + ' accounts recommended to be deleted.')
 
     needs_account = OrderedDict()
-    for student in powerschool_users.keys():
-        conn.search(search_base='o=snakeriver',
+    for student in sis_users.keys():
+        conn.search(search_base='o=xyz',
                     search_filter='(uid=' + student + ')',
                     search_scope=SUBTREE)
         if len(conn.entries) > 0:
             continue
-        needs_account[student] = powerschool_users[student]
+        needs_account[student] = sis_users[student]
 
     logging.info('\nStudents who need to be added to LDAP:')
     logging.info(needs_account.keys())
@@ -283,9 +319,9 @@ def compare_to_ldap(powerschool_users, needs_ps_username=0):
         logging.info('No accounts need to be deleted.')
     else:
         error_count = 0
-        # User exists in LDAP but not PowerSchool -> we can delete them from LDAP
+        # User exists in LDAP but not SIS -> we can delete them from LDAP
         for username in needs_deletion:
-            conn.search(search_base='o=snakeriver',
+            conn.search(search_base='o=xyz',
                         search_filter='(uid=' + username + ')')
             user = conn.entries[0].entry_dn
             conn.delete(user)
@@ -298,7 +334,7 @@ def compare_to_ldap(powerschool_users, needs_ps_username=0):
         logging.info('\nAccount deletion process completed with ' + str(error_count) + ' errors.')
 
     pass_list = create_ldap_accounts(needs_account)
-    update_students_in_ps(needs_account, pass_list)
+    update_students_in_sis(needs_account, pass_list)
     conn.unbind()
 
 
@@ -338,7 +374,7 @@ def convert_information(user_list):
         first_name = user_list[k][0].title()
         last_name = user_list[k][1].title()
         full_name = first_name + ' ' + last_name
-        email = k + "@snakeriver.org"
+        email = k + "@xyz.org"
         information = pwd + ',' + k + ',' + full_name + ',' + last_name + ',' + first_name + ',' + email
 
         information_list.append(information)
@@ -349,6 +385,8 @@ def convert_information(user_list):
 def search(lst, item):
     item += '\n'
     i = bisect_left(lst, item)
+    if i is None: return None
+    
     if i != len(lst) and lst[i] == item:
         return i
     return None
@@ -359,8 +397,11 @@ def resolve_username(curr_username, username_list, first_name, last_name, gradua
     last_name_partition = last_name
     num_attempts = 0
 
+    logging.info(username_list)
+
     if category == 'student':
-        while search(username_list, curr_username) is not None:
+        #while search(username_list, curr_username) is not None:
+        while curr_username in username_list:
             logging.info('\nUsername ' + curr_username + ' exists.')
 
             # extreme edge case - all possible usernames are taken
@@ -369,7 +410,10 @@ def resolve_username(curr_username, username_list, first_name, last_name, gradua
                 sys.exit(1)
 
             if len(curr_username) < 8:
-                curr_username = str(graduation_year)[2:] + last_name + first_name[:8 - len(curr_username) + 1]
+                last_name_partition = last_name_partition[:-1]
+                first_name_partition = first_name[:6 - len(last_name_partition)]
+                curr_username = str(graduation_year)[2:] + last_name_partition + first_name_partition
+                # curr_username = str(graduation_year)[2:] + last_name[:-1] + first_name[:8 - len(curr_username)]
             else:
                 last_name_partition = last_name_partition[:-1]
                 first_name_partition = first_name[:6 - len(last_name_partition)]
@@ -404,7 +448,7 @@ def resolve_username(curr_username, username_list, first_name, last_name, gradua
 # file if it doesn't exist.
 # returns the list of possible words
 def make_word_file():
-    word_list_path = os.path.join(sys.path[0], 'snake_river_word_list.txt')
+    word_list_path = os.path.join(sys.path[0], 'xxx_yyy_word_list.txt')
 
     try:
         f = open(word_list_path)
@@ -426,13 +470,13 @@ def make_word_file():
 
 
 # Return false if the potential username is in ldap already, return true otherwise
-# cn = username, ou = Grade##, o = snakeriver
+# cn = username, ou = Grade##, o = xyz
 def check_name_in_ldap(candidate):
-    server = Server(host='virgil-2.snakeriver.org', port=636, use_ssl=True, get_info=NONE)
+    server = Server(host='myserver.xyz.org', port=636, use_ssl=True, get_info=NONE)
     conn = Connection(server, read_only=True)
     conn.bind()
 
-    conn.search(search_base='o=snakeriver', search_filter='(uid=' + candidate + ')')
+    conn.search(search_base='o=xyz', search_filter='(uid=' + candidate + ')')
     if len(conn.entries) > 0:
         logging.info('Username exists in ldap: ')
         logging.info(conn.entries[0])
@@ -468,9 +512,10 @@ def make_info_files(information, grade_level_list):
 
 # Dynamically creates ctl files to know which Context (Grade level) to add the students to
 def make_dynamic_ctl_files(grade_level_list):
+    logging.info(grade_level_list)
     dynamic_file_path = 'c:\\jrb\\dynamic_ctl_file.ctl'
 
-    template = ['\t\tSEPARATOR=,', '\t\tUSER TEMPLATE=Y', '\t\tUse two passes=Y', 'FIELDS', '\tPassword',
+    template = ['\t\tSEPARATOR=,', '\t\tSet Universal Passwords=y', '\t\tUSER TEMPLATE=Y', '\t\tUse two passes=Y', 'FIELDS', '\tPassword',
                 '\tName', '\tFull Name', '\tLast Name', '\tGiven Name', '\tInternet Email Address']
 
     # Delete all of the dynamic ctl files, so that we only have templates for the grades we need to upload
@@ -483,7 +528,7 @@ def make_dynamic_ctl_files(grade_level_list):
     while len(grade_level_list) != 0:
         with open(dynamic_file_path, mode='w') as dynamic_file:
             dynamic_file.write('IMPORT CONTROL\n')
-            dynamic_file.write('\t\tNAME CONTEXT="' + '.Grade-' + str(grade_level_list[0]).zfill(2) + '.Snakeriver"\n')
+            dynamic_file.write('\t\tNAME CONTEXT="' + '.Grade-' + str(grade_level_list[0]).zfill(2) + '.xyz"\n')
             dynamic_file.write('\n'.join(template))
 
         if not os.path.exists('c:\\jrb\\dynamic_ctl_file' + '_Grade' + str(grade_level_list[0]).zfill(2) + '.ctl'):
@@ -512,12 +557,12 @@ def import_using_jrb():
               '/$', '/e', '/v', '/x=10'])
 
 
-# Take the newly added first graders and update PowerSchool fields
-def update_students_in_ps(user_list, pass_list):
+# Take the newly added first graders and update SIS fields
+def update_students_in_sis(user_list, pass_list):
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
     # *** ENTER FTP USERNAME AND PASSWORD HERE
-    srv = pysftp.Connection(host='10.110.204.14', username='_____', password='_____', port=22, cnopts=cnopts)
+    srv = pysftp.Connection(host='www.xxx.yyy.zzz', username='myname', password='mysecretpassword', port=22, cnopts=cnopts)
 
     directory = os.getcwd()
     filename = os.path.join(directory, 'new_stds.txt')
@@ -551,7 +596,7 @@ def update_students_in_ps(user_list, pass_list):
 
         new_stds.close()
 
-    srv.put(filename, '/Steve/new_stds.txt', preserve_mtime=True)
+    srv.put(filename, '/sample.txt', preserve_mtime=True)
 
     srv.close()
 
@@ -562,48 +607,63 @@ def excel_date(date):
     delta = datetime.datetime.strptime(date, '%m/%d/%Y') - temp
     return int(delta.days) + int(int(delta.seconds) / 86400) + 1
 
-
 # templates
 # user[first_name, last_name, curr_grade, birthday, student_id]
 # resolve_username(curr_username, username_list, first_name, last_name, graduation_year, category):
-def handle_new_ps_users(needs_username_list):
+def handle_new_sis_users(needs_username_list):
     new_username_list = dict()
     empty_dict = dict()
 
-    ldap_un_list = compare_to_ldap(empty_dict, needs_ps_username=1)
+    # temporary list to hold candidates, twin problem
+    temp_list = []
+
+    ldap_un_list = compare_to_ldap(empty_dict, 1)
+    # logging.info(ldap_un_list)
+    
     for user in needs_username_list:
-        graduation_year = (datetime.date.today().year + (12 - user[2]) + 1)
+        if user[2] == 'PK3':
+            graduation_year = datetime.date.today().year + 14
+            # logging.info('Graduation year is ' + str(graduation_year))
+        elif user[2] == 'PK4':
+            graduation_year = datetime.date.today().year + 13
+            # logging.info('Graduation year is ' + str(graduation_year))
+        else:
+            graduation_year = (datetime.date.today().year + (12 - int(user[2])))
         first_name_split = split_name(user[0])
         last_name_split = split_name(user[1])
 
         if len(last_name_split) >= 5:
-            candidate = str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]
-            while (candidate in ldap_un_list) or (candidate in new_username_list.keys()):
+            candidate = (str(graduation_year)[2:] + last_name_split[:5] + first_name_split[0]).lower()
+            while (candidate in ldap_un_list) or (candidate in temp_list):
                 candidate = \
-                    resolve_username(candidate, ldap_un_list + list(new_username_list.keys()), first_name_split,
-                                     last_name_split[:5], graduation_year, 'student')
-        else:
-            candidate = str(graduation_year)[2:] + last_name_split + first_name_split[0]
-            while (candidate in ldap_un_list) or (candidate in new_username_list.keys()):
-                candidate = \
-                    resolve_username(candidate, ldap_un_list + list(new_username_list.keys()), first_name_split,
-                                     last_name_split, graduation_year, 'student')
+                    resolve_username(candidate, ldap_un_list + temp_list, first_name_split, last_name_split[:5],
+                                     graduation_year, 'student')
 
+        else:
+            candidate = (str(graduation_year)[2:] + last_name_split + first_name_split[0]).lower()
+            while (candidate in ldap_un_list) or (candidate in temp_list):
+                candidate = \
+                    resolve_username(candidate, ldap_un_list + temp_list, first_name_split, last_name_split, graduation_year,
+                                     'student')
+
+        logging.info('Successful candidate: ' + candidate)
         new_username_list[candidate] = [user[0], user[1], user[2], user[3], user[4]]
+        temp_list.append(candidate)
 
     pass_list = create_ldap_accounts(new_username_list)
-    update_students_in_ps(new_username_list, pass_list)
-    
-    
+    update_students_in_sis(new_username_list, pass_list)
+
+
 # main function
 def create_user():
     while True:
         logging.info('\n')
         logging.info('1) Run the manual student creation utility ' +
-              '(creates student in LDAP. Will have to be manually added to PowerSchool)')
-        logging.info('2) Run the automated student creation/deletion utility (also updates student info in PowerSchool)')
+              '(creates student in LDAP. Will have to be manually added to SIS)')
+        logging.info('2) Run the automated student creation/deletion utility (also updates student info in SIS)')
         logging.info('3) Quit')
         menu_prompt = int(input().strip())
+        # menu_prompt = 2
 
         if menu_prompt == 1:
             # print("Are you creating a student or staff account?: ")
@@ -637,11 +697,14 @@ def create_user():
                     make_dynamic_ctl_files(grade_levels)
                     import_using_jrb()
         elif menu_prompt == 2:
-            ps_user_list, needs_username_list = usernames_from_sftp()
-            compare_to_ldap(ps_user_list)
-            
+            sis_user_list, needs_username_list = usernames_from_sftp()
+            compare_to_ldap(sis_user_list)
+
+            # here might work, needs to delete students who no longer attend BEFORE adding more
             if len(needs_username_list) > 0:
-                handle_new_ps_users(needs_username_list)
+                handle_new_sis_users(needs_username_list)
+                
+            sys.exit(0)
         elif menu_prompt == 3:
             sys.exit(0)
         else:
@@ -708,7 +771,7 @@ if __name__ == '__main__':
 #
 #         word_list = make_word_file()
 #
-#         secure_random = SystemRandom()
+#         secure_random = SystemRandom()78
 #         first_word = secure_random.choice(word_list)
 #         second_word = secure_random.choice(word_list)
 #
@@ -725,7 +788,7 @@ if __name__ == '__main__':
 #         print(pwd)
 #
 #         full_name = first_name.title() + ' ' + last_name.title()
-#         email = candidate + "@snakeriver.org"
+#         email = candidate + "@xyz.org"
 #         print("\nInformation:")
 #         print(pwd + ',' + candidate + ',' + full_name + ','
 #               + last_name.title() + ',' + first_name.title() + ',' + email)
@@ -741,7 +804,7 @@ if __name__ == '__main__':
 #             continue
 #         elif (user_prompt == 'n') or (user_prompt == 'no'):
 #             return
-# Grabs all student usernames from PowerSchool
+# Grabs all student usernames from SIS
 # def generate_student_username_list():
 #     student_list_path = os.path.join(sys.path[0], 'student.export.TEXT')
 #     student_username_list = os.path.join(sys.path[0], 'student_usernames.txt')
@@ -753,25 +816,25 @@ if __name__ == '__main__':
 #     # except FileNotFoundError:
 #     #     print('\nUsername file not found.')
 #
-#     print('\nEnter your PowerSchool username: ')
-#     ps_username = input()
+#     print('\nEnter your SIS username: ')
+#     sis_username = input()
 #
-#     while ps_username == '':
+#     while sis_username == '':
 #         print('Usernames cannot be empty.')
-#         print('\nEnter your PowerSchool username: ')
-#         ps_username = input()
+#         print('\nEnter your SIS username: ')
+#         sis_username = input()
 #
-#     ps_password = getpass.getpass('PowerSchool password: ')
-#     url = 'https://ps.snakeriver.org/admin/pw.html'
+#     sis_password = getpass.getpass('SIS password: ')
+#     url = 'httsis://sis.xyz.org/admin/pw.html'
 #
 #     # setup the browser profile so that the file downloads to the right place without asking
 #     profile = webdriver.FirefoxProfile()
 #     profile.set_preference('browser.download.folderList', 2)
 #     profile.set_preference('browser.download.manager.showWhenStarting', False)
 #     profile.set_preference('browser.download.dir', sys.path[0])
-#     profile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'text/ps-export')
-#     profile.set_preference('browser.helperApps.alwaysAsk.force', False)
-#     profile.set_preference('browser.helperApps.neverAsk.openFile', 'text/ps-export')
+#     profile.set_preference('browser.helperApsis.neverAsk.saveToDisk', 'text/sis-export')
+#     profile.set_preference('browser.helperApsis.alwaysAsk.force', False)
+#     profile.set_preference('browser.helperApsis.neverAsk.openFile', 'text/sis-export')
 #     profile.set_preference('browser.download.manager.useWindow', False)
 #     profile.set_preference('browser.download.manager.focusWhenStarting', False)
 #     profile.set_preference('browser.download.manager.alertOnEXEOpen', False)
@@ -784,8 +847,8 @@ if __name__ == '__main__':
 #
 #     username = driver.find_element_by_name('username')
 #     password = driver.find_element_by_name('password')
-#     username.send_keys(ps_username)
-#     password.send_keys(ps_password)
+#     username.send_keys(sis_username)
+#     password.send_keys(sis_password)
 #
 #     driver.find_element_by_name('LoginForm').submit()
 #     delay = 10
